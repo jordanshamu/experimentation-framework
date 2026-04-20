@@ -1,4 +1,4 @@
-# 🧪 Experimentation Framework
+# Experimentation Framework
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -11,21 +11,7 @@
 
 ---
 
-## 🗺️ Portfolio Context
-
-This is **Project 5 of 5** in a data-science portfolio targeting Data Analyst, Business Analyst, and Product Analyst roles.
-
-| # | Project | Focus |
-|---|---------|-------|
-| 1 | Healthcare Readmission Prediction | Clinical ML, risk stratification |
-| 2 | [Marketing A/B Test Analysis](https://github.com/jordanshamu/Marketing-A-B-Test-Analysis) | Frequentist testing, conversion lift |
-| 3 | Customer Segmentation & Cohort Analysis | RFM, K-Means, CLV |
-| 4 | Customer Churn Prediction | XGBoost, SHAP, cost-benefit |
-| **5** | **Experimentation Framework** ← *you are here* | **Advanced testing, Bayesian methods** |
-
----
-
-## 🎯 What This Framework Solves
+## What This Framework Solves
 
 Running a single A/B test is easy. Running experiments *correctly at scale* is hard. This framework addresses the four most common and costly mistakes:
 
@@ -38,7 +24,7 @@ Running a single A/B test is easy. Running experiments *correctly at scale* is h
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 experimentation-framework/
@@ -61,7 +47,7 @@ experimentation-framework/
 
 ---
 
-## 🔬 Framework Components
+## Framework Components
 
 ### 1 · Power & Sample Size Calculator
 Interactive functions for **proportion tests** and **t-tests** that output required sample sizes given significance level (α), power (1-β), and minimum detectable effect (MDE). Includes:
@@ -102,7 +88,7 @@ A dedicated notebook section retroactively applies this framework to the 588,101
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Python 3.8+
@@ -140,7 +126,7 @@ print(summary["recommendation"])
 
 ---
 
-## 📊 Key Results & Insights
+## Key Results & Insights
 
 | Component | Key Finding |
 |-----------|-------------|
@@ -152,7 +138,7 @@ print(summary["recommendation"])
 
 ---
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 `Python 3.8+` · `NumPy` · `SciPy` · `Pandas` · `Matplotlib` · `Seaborn` · `Jupyter Lab`
 
@@ -160,7 +146,7 @@ All statistical routines are implemented from first principles in `src/stats_uti
 
 ---
 
-## 📝 Methodology Decisions
+## Methodology Decisions
 
 **Why Beta-Binomial (not MCMC)?**  
 The conjugate model is analytically exact for conversion-rate experiments and runs in milliseconds. MCMC (PyMC) adds complexity without benefit when the likelihood is Binomial.
@@ -180,4 +166,3 @@ Understanding the mechanics of each correction is critical for explaining trade-
 
 ---
 
-*Part of a 5-project data science portfolio — built to demonstrate production-quality analytical thinking, not just code.*
