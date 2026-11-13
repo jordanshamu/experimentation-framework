@@ -1,6 +1,6 @@
 # Experimentation Framework
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%E2%80%933.13-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Portfolio Project](https://img.shields.io/badge/Portfolio-Project%205%20of%205-brightgreen)](https://datascienceportfol.io/jordanshamu)
 [![Status: Complete](https://img.shields.io/badge/Status-Complete-success)](https://github.com/jordanshamu/experimentation-framework)
@@ -61,7 +61,7 @@ Interactive functions for **proportion tests** and **t-tests** that output requi
 Two valid approaches to monitoring experiments in real time:
 - **SPRT (Sequential Probability Ratio Test)** — Wald's method with explicit H0/H1 boundaries
 - **O'Brien-Fleming** — boundaries c_k = C·√(K/k), with C solved numerically so the overall Type I error rate across all looks equals α
-- Simulation comparing naive peeking against both valid methods on identical data
+- Simulation comparing naive peeking with O'Brien-Fleming on the same data, plus a separate SPRT demo
 
 ### 3 · Multiple Testing Corrections
 Side-by-side comparison on 20 simultaneous simulated hypotheses:
@@ -93,7 +93,7 @@ A notebook section applies this framework to the counts from the 588,101-user [M
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.11–3.13 (tests pass on 3.11, 3.12 and 3.13; SciPy 1.16+ needs Python 3.11 or newer)
 - Jupyter Lab 4.x
 
 ### Installation
@@ -140,7 +140,7 @@ print(summary["recommendation"])
 |-----------|-------------|
 | Power analysis | A 2 pp MDE from a 10% baseline requires **3,841 users/variant** at 80% power |
 | Sequential testing | In 100,000 simulated null tests with 10 equally spaced looks at α = 0.05, stopping at the first \|z\| ≥ 1.96 gave a **19.2%** false positive rate; calibrated O'Brien-Fleming boundaries gave 4.9% |
-| Multiple testing | 20 simultaneous tests at α=0.05 → expected **1 false discovery**; BH-FDR reduces this to ≤1 |
+| Multiple testing | With 20 tests and no real effects, uncorrected testing at α=0.05 expects **1 false positive** (20 × 0.05). In the notebook's simulation (14 nulls, 6 small real effects), uncorrected testing rejected 2 (both real); Bonferroni, Holm and BH rejected none |
 | Bayesian vs. frequentist | Both methods agree directionally, but Bayesian expected loss gives a **richer decision signal** |
 | Project 2 retro | Ad 2.555% vs PSA 1.785% (43.1% relative lift, p = 1.7e-13). With the 96/4 split, power for a 10% relative lift was **52.5%**; the same 588,101 users split 50/50 would give 99.9% |
 
@@ -148,7 +148,7 @@ print(summary["recommendation"])
 
 ## Technical Stack
 
-`Python 3.8+` · `NumPy` · `SciPy` · `Pandas` · `Matplotlib` · `Seaborn` · `Jupyter Lab`
+`Python 3.11+` · `NumPy` · `SciPy` · `Pandas` · `Matplotlib` · `Seaborn` · `Jupyter Lab`
 
 All statistical routines are implemented from first principles in `src/stats_utils.py` — no black-box testing libraries.
 
