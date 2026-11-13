@@ -3,6 +3,7 @@ stats_utils.py  –  Experimentation Framework · Portfolio Project 5
 Author: Jordan Shamukiga
 """
 from __future__ import annotations
+from functools import lru_cache
 from typing import Optional
 import numpy as np
 import pandas as pd
@@ -35,14 +36,22 @@ def sample_size_ttest(mean_baseline, std_baseline, mde, alpha=0.05, power=0.80, 
                 alpha=alpha, power=power)
 
 def power_curve(p_baseline, mde_range, n_per_variant, alpha=0.05, two_tailed=True):
-    """Power at each MDE for a fixed n per variant."""
+    """Power at each MDE for a fixed n per variant.
+
+    Two-tailed: P(Z >= z_a/2) + P(Z <= -z_a/2) under the alternative.
+    One-tailed: upper tail only, using the signed effect, so a zero or
+    negative MDE gives power <= alpha.
+    """
     za = _za(alpha, two_tailed)
     out = []
     for mde in mde_range:
         p_t = p_baseline + mde
         se  = np.sqrt(p_baseline*(1-p_baseline)/n_per_variant + p_t*(1-p_t)/n_per_variant)
-        ncp = abs(mde) / max(se, 1e-12)
-        out.append(1 - stats.norm.cdf(za - ncp) + stats.norm.cdf(-za - ncp))
+        ncp = mde / max(se, 1e-12)
+        if two_tailed:
+            out.append(stats.norm.sf(za - ncp) + stats.norm.cdf(-za - ncp))
+        else:
+            out.append(stats.norm.sf(za - ncp))
     return np.array(out)
 
 def sample_size_curve(p_baseline, mde_range, alpha=0.05, power=0.80):
@@ -60,21 +69,50 @@ def sprt_llr(x_treatment, n_treatment, p0, p1):
     return (x_treatment*np.log(p1/p0) +
             (n_treatment-x_treatment)*np.log((1-p1)/(1-p0)))
 
-def obrien_fleming_boundaries(n_looks, alpha=0.05, two_tailed=True):
-    """O'Brien-Fleming critical z-values at each interim look."""
-    fracs = np.linspace(1/n_looks, 1.0, n_looks)
-    return _za(alpha, two_tailed) / np.sqrt(fracs)
+def _crossing_prob(c, n_looks, two_tailed=True):
+    """P(|Z_k| >= c*sqrt(K/k) for some k) under H0, equally spaced looks."""
+    k = np.arange(1, n_looks + 1)
+    bounds = c * np.sqrt(n_looks / k)
+    cov = np.sqrt(np.minimum.outer(k, k) / np.maximum.outer(k, k))
+    kw = dict(mean=np.zeros(n_looks), cov=cov, maxpts=20_000 * n_looks,
+              abseps=1e-6, releps=1e-6, rng=0)
+    if two_tailed:
+        stay = stats.multivariate_normal.cdf(bounds, lower_limit=-bounds, **kw)
+    else:
+        stay = stats.multivariate_normal.cdf(bounds, **kw)
+    return 1.0 - stay
 
-def simulate_sequential_test(p_control, p_treatment, n_total,
+@lru_cache(maxsize=None)
+def _obf_constant(n_looks, alpha, two_tailed):
+    if n_looks == 1:
+        return float(_za(alpha, two_tailed))
+    from scipy.optimize import brentq
+    return float(brentq(lambda c: _crossing_prob(c, n_looks, two_tailed) - alpha,
+                        1.0, 6.0, xtol=1e-5))
+
+def obrien_fleming_boundaries(n_looks, alpha=0.05, two_tailed=True):
+    """O'Brien-Fleming critical z-values for equally spaced interim looks.
+
+    c_k = C * sqrt(K/k), with C solved numerically so that the overall
+    probability of crossing any boundary under H0 equals alpha. Under H0 the
+    look statistics are multivariate normal with
+    corr(Z_i, Z_j) = sqrt(min(i, j) / max(i, j)).
+    """
+    C = _obf_constant(int(n_looks), float(alpha), bool(two_tailed))
+    k = np.arange(1, n_looks + 1)
+    return C * np.sqrt(n_looks / k)
+
+def simulate_sequential_test(p_control, p_treatment, n_per_arm,
                               alpha=0.05, beta=0.20, n_looks=10, seed=42):
     """
     Simulate streaming experiment; compare naive peeking vs O'Brien-Fleming.
+    n_per_arm observations are generated in each arm (equal allocation).
     Returns dict with DataFrame of per-look stats and stopping info.
     """
     rng  = np.random.default_rng(seed)
-    ctrl = rng.binomial(1, p_control,   n_total)
-    trt  = rng.binomial(1, p_treatment, n_total)
-    sizes     = [int(n_total*(i+1)/n_looks) for i in range(n_looks)]
+    ctrl = rng.binomial(1, p_control,   n_per_arm)
+    trt  = rng.binomial(1, p_treatment, n_per_arm)
+    sizes     = [int(n_per_arm*(i+1)/n_looks) for i in range(n_looks)]
     of_bounds = obrien_fleming_boundaries(n_looks, alpha)
     z_naive   = _za(alpha)
     rows, ns, os_ = [], None, None
@@ -96,7 +134,7 @@ def simulate_sequential_test(p_control, p_treatment, n_total,
                          naive_reject=nr, obf_reject=or_))
     return dict(results=pd.DataFrame(rows), naive_stopped=ns, obf_stopped=os_,
                 true_effect=round(p_treatment-p_control,4),
-                n_looks=n_looks, n_total=n_total)
+                n_looks=n_looks, n_per_arm=n_per_arm)
 
 # ── 3. MULTIPLE TESTING CORRECTIONS ─────────────────────────────────────────
 def bonferroni(p_values, alpha=0.05):
@@ -106,12 +144,13 @@ def bonferroni(p_values, alpha=0.05):
     return dict(method="Bonferroni", adjusted_p=adj, rejected=rej, n_rejected=int(rej.sum()))
 
 def holm_bonferroni(p_values, alpha=0.05):
+    """Holm step-down. Adjusted p = running max of p_(i)*(m-i+1), capped at 1."""
+    p_values = np.asarray(p_values, dtype=float)
     m, idx = len(p_values), np.argsort(p_values)
-    adj, rej, ok = np.zeros(m), np.zeros(m, bool), True
-    for rank, i in enumerate(idx):
-        adj[i] = min(p_values[i]*(m-rank), 1.0)
-        if ok and p_values[i] <= alpha/(m-rank): rej[i] = True
-        else: ok = False
+    step = np.minimum(p_values[idx] * (m - np.arange(m)), 1.0)
+    adj = np.zeros(m)
+    adj[idx] = np.maximum.accumulate(step)
+    rej = adj <= alpha
     return dict(method="Holm-Bonferroni", adjusted_p=adj, rejected=rej, n_rejected=int(rej.sum()))
 
 def benjamini_hochberg(p_values, alpha=0.05):
@@ -180,16 +219,19 @@ def bayesian_ab_summary(n_control, x_control, n_treatment, x_treatment,
                 n_control=n_control, n_treatment=n_treatment)
 
 def frequentist_ab_summary(n_control, x_control, n_treatment, x_treatment, alpha=0.05):
+    """Two-proportion z-test. The CI on the difference has level 1 - alpha."""
     pc,pt = x_control/n_control, x_treatment/n_treatment
     pp    = (x_control+x_treatment)/(n_control+n_treatment)
     se    = max(np.sqrt(pp*(1-pp)*(1/n_control+1/n_treatment)), 1e-12)
     z     = (pt-pc)/se
-    pv    = 2*(1-stats.norm.cdf(abs(z)))
+    pv    = 2*stats.norm.sf(abs(z))
     se2   = np.sqrt(pc*(1-pc)/n_control+pt*(1-pt)/n_treatment)
-    ci    = [(pt-pc)+stats.norm.ppf(q)*se2 for q in [0.025,0.975]]
+    zc    = stats.norm.ppf(1 - alpha/2)
+    ci    = [(pt-pc) - zc*se2, (pt-pc) + zc*se2]
     return dict(p_control=round(pc,4), p_treatment=round(pt,4),
                 absolute_lift=round(pt-pc,4),
                 relative_lift_pct=round((pt-pc)/pc*100,2),
-                z_statistic=round(z,4), p_value=round(pv,6),
+                z_statistic=round(z,4), p_value=float(pv),
                 significant=bool(pv<alpha),
-                ci_95_diff=[round(c,4) for c in ci], alpha=alpha)
+                ci_diff=[round(float(c),4) for c in ci], ci_level=1-alpha,
+                alpha=alpha)
