@@ -47,19 +47,19 @@ than your stated 5%.
 
 **The Solution:** **Sequential Analysis** using two validated methods (SPRT and
 O'Brien-Fleming boundaries) tells you exactly when a test *can* safely be called early
-versus when it must run to completion. The framework shows, on simulated data, that naive
-peeking at 10 interim looks can inflate your false positive rate by ~40%.
+versus when it must run to completion. In 100,000 simulated tests with no real effect and
+10 equally spaced looks at α = 0.05, stopping at the first "significant" look produced a
+19.2% false positive rate. Calibrated O'Brien-Fleming boundaries kept it at 4.9%.
 
-**Business Impact:** Enables faster decisions *without* sacrificing statistical
-credibility. Saves 20–40% of experiment runtime when effects are large, while protecting
-the team from shipping duds.
+**Business Impact:** Allows a test to end early when the effect is large, without
+raising the false positive rate above the stated 5%.
 
 ---
 
 ### 3. Stop Counting Wins When You're Testing 20 Things at Once
 
-**The Problem:** When you run 20 simultaneous tests, pure chance alone will generate one
-"significant" false positive at α = 0.05. Teams that ignore this inflate their shipped
+**The Problem:** When you run 20 simultaneous tests where nothing is real, chance alone
+produces on average one "significant" false positive at α = 0.05. Teams that ignore this inflate their shipped
 feature count with changes that do nothing — or worse, harm users.
 
 **The Solution:** **Multiple Testing Corrections** show three validated approaches
@@ -85,11 +85,13 @@ confident are we? What do we lose if we're wrong?*
 
 **The Solution:** **Bayesian A/B Testing** produces:
 - A probability distribution over the true conversion rate (not a point estimate)
-- **Probability that treatment beats control** (e.g., "92% confident treatment is better")
-- **Expected loss** — the average revenue impact of making the wrong decision
+- **Probability that treatment beats control**
+- **Expected loss** — the average conversion-rate cost of making the wrong decision
 
-This replaces "p=0.04, ship it" with "there is a 94% chance treatment is better, and
-the expected cost of being wrong is 0.3 pp — within our risk tolerance."
+This replaces "p < 0.05, ship it" with a statement of how likely treatment is to be
+better and what being wrong would cost. In the notebook's simulated example
+(5,000 users per arm), P(treatment > control) is 99.9% and the expected loss of
+shipping treatment is 0.0002 pp.
 
 **Business Impact:** Richer decisions. Less hedging. Clearer communication to leadership.
 
@@ -111,18 +113,19 @@ the same rigour:
 
 ## Connection to Prior Work
 
-This framework was retrospectively applied to
-[Project 2: Marketing A/B Test Analysis](https://github.com/jordanshamu/Marketing-A-B-Test-Analysis)
-(588,101 users; 42.5% conversion lift; p < 0.001). Key findings:
+This framework was applied to the counts from
+[Project 2: Marketing A/B Test Analysis](https://github.com/jordanshamu/Marketing-A-B-Test-Analysis):
+ad 14,423 conversions of 564,577 users (2.555%) and PSA 420 of 23,524 (1.785%), a 43.1%
+relative lift (p = 1.7e-13). Traffic was split about 96% ad / 4% PSA. Key findings:
 
-- The test was **massively overpowered** (~70x the required sample), which raises
-  questions about whether a stopping rule was ever defined or whether the test simply
-  ran until someone checked the dashboard.
-- O'Brien-Fleming boundaries indicate the test **could have been called safely at
-  roughly 70% of the planned runtime**, saving approximately 2 weeks of experiment time.
-- The Bayesian posterior shows **P(treatment > control) > 99.9%** — unsurprising given
-  the sample size. The Bayesian comparison is confirmatory here; you would only see
-  meaningful divergence from the frequentist result in borderline cases with far smaller n.
+- The small PSA arm limits precision. Power to detect a 10% relative lift (chosen in
+  advance, not the observed effect) was **52.5%** with the actual split; the same
+  588,101 users split 50/50 would have given 99.9%.
+- The data has no exposure timestamps, so whether the test could have stopped early
+  cannot be assessed. The notebook includes only a labelled simulation using the
+  observed rates and allocation.
+- The Bayesian posterior gives P(ad > PSA) = 1.0000 (all 200,000 posterior draws), with a
+  95% credible interval for the relative lift of 29.9% to 57.5%. Both approaches agree.
 
 ---
 
@@ -144,7 +147,7 @@ This framework was retrospectively applied to
 Good experimentation is a competitive advantage. Teams that run tests correctly —
 with adequate power, valid stopping rules, and proper multiple-comparison handling —
 make better product decisions faster. This framework operationalises those practices
-into reusable, documented, production-ready tools.
+into reusable, documented and tested functions.
 
 The complete technical implementation, source code, and worked examples are available
 at [github.com/jordanshamu/experimentation-framework](https://github.com/jordanshamu).

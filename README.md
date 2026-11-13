@@ -5,7 +5,7 @@
 [![Portfolio Project](https://img.shields.io/badge/Portfolio-Project%205%20of%205-brightgreen)](https://datascienceportfol.io/jordanshamu)
 [![Status: Complete](https://img.shields.io/badge/Status-Complete-success)](https://github.com/jordanshamu/experimentation-framework)
 
-> **A production-grade, reusable A/B testing toolkit** that answers the question every product team faces: *"How do we run experiments that we can actually trust?"*
+> **A tested toolkit for planning and analysing A/B tests.** It addresses a question every product team faces: *"How do we run experiments that we can actually trust?"*
 
 **Jordan Shamukiga** · [Portfolio](https://datascienceportfol.io/jordanshamu) · [GitHub](https://github.com/jordanshamu) · [LinkedIn](#)
 
@@ -29,9 +29,11 @@ Running a single A/B test is easy. Running experiments *correctly at scale* is h
 ```
 experimentation-framework/
 ├── notebooks/
-│   └── experimentation_framework.ipynb   ← main analysis (self-contained, synthetic data)
+│   └── experimentation_framework.ipynb   ← main analysis (synthetic data + Project 2 counts)
 ├── src/
 │   └── stats_utils.py                    ← all statistical functions (importable module)
+├── tests/
+│   └── test_stats_utils.py               ← pytest suite (known answers, statsmodels checks, null simulations)
 ├── templates/
 │   ├── experiment_brief.md               ← template for experiment planning
 │   ├── preregistration_checklist.md      ← pre-registration before launch
@@ -58,7 +60,7 @@ Interactive functions for **proportion tests** and **t-tests** that output requi
 ### 2 · Sequential Analysis / Early Stopping
 Two valid approaches to monitoring experiments in real time:
 - **SPRT (Sequential Probability Ratio Test)** — Wald's method with explicit H0/H1 boundaries
-- **O'Brien-Fleming** — alpha-spending boundaries that preserve the overall Type I error rate
+- **O'Brien-Fleming** — boundaries c_k = C·√(K/k), with C solved numerically so the overall Type I error rate across all looks equals α
 - Simulation comparing naive peeking against both valid methods on identical data
 
 ### 3 · Multiple Testing Corrections
@@ -81,10 +83,10 @@ Three markdown-formatted deliverables a PM or analyst team would actually use:
 - **Results Write-Up** — standardised format for sharing conclusions
 
 ### 6 · Project 2 Tie-Back
-A dedicated notebook section retroactively applies this framework to the 588,101-user [Marketing A/B Test](https://github.com/jordanshamu/Marketing-A-B-Test-Analysis):
-- Was the sample size adequately powered for the 42.5% conversion lift found?
-- Would SPRT or O'Brien-Fleming have allowed early stopping?
-- What does the Bayesian posterior say about that result?
+A notebook section applies this framework to the counts from the 588,101-user [Marketing A/B Test](https://github.com/jordanshamu/Marketing-A-B-Test-Analysis) (ad 14,423 / 564,577 = 2.555%; PSA 420 / 23,524 = 1.785%; 43.1% relative lift; about 96/4 allocation):
+- Power for the unequal arms at a pre-chosen minimum effect (10% relative lift), not at the observed effect
+- A clearly labelled simulation of O'Brien-Fleming monitoring using the observed rates and allocation (the data has no timestamps, so the real test's stopping behaviour cannot be analysed)
+- The Bayesian posterior for the observed counts
 
 ---
 
@@ -103,7 +105,13 @@ pip install -r requirements.txt
 jupyter lab notebooks/experimentation_framework.ipynb
 ```
 
-The notebook is **fully self-contained** — all data is synthetically generated inline. No external datasets required.
+Run the tests:
+
+```bash
+pytest tests
+```
+
+No external datasets are required. Sections 1–5 generate synthetic data inline; Section 6 uses the Project 2 summary counts, which are entered in the notebook.
 
 ### Using `stats_utils` in Your Own Project
 
@@ -115,7 +123,7 @@ from stats_utils import sample_size_proportion, bayesian_ab_summary
 # How many users do I need to detect a 2pp lift from a 10% baseline?
 result = sample_size_proportion(p_baseline=0.10, mde=0.02, alpha=0.05, power=0.80)
 print(result)
-# {'n_per_variant': 3842, 'total_n': 7684, ...}
+# {'n_per_variant': 3841, 'total_n': 7682, ...}
 
 # Run a full Bayesian summary
 summary = bayesian_ab_summary(n_control=5000, x_control=500,
@@ -130,11 +138,11 @@ print(summary["recommendation"])
 
 | Component | Key Finding |
 |-----------|-------------|
-| Power analysis | A 2 pp MDE from a 10% baseline requires **~3,842 users/variant** at 80% power |
-| Sequential testing | Naive peeking at 10 interim looks inflates Type I error by **~40%** vs. nominal α |
+| Power analysis | A 2 pp MDE from a 10% baseline requires **3,841 users/variant** at 80% power |
+| Sequential testing | In 100,000 simulated null tests with 10 equally spaced looks at α = 0.05, stopping at the first \|z\| ≥ 1.96 gave a **19.2%** false positive rate; calibrated O'Brien-Fleming boundaries gave 4.9% |
 | Multiple testing | 20 simultaneous tests at α=0.05 → expected **1 false discovery**; BH-FDR reduces this to ≤1 |
 | Bayesian vs. frequentist | Both methods agree directionally, but Bayesian expected loss gives a **richer decision signal** |
-| Project 2 retro | The 588K-user Marketing test was **~70× overpowered**; O'Brien-Fleming would have enabled safe early stopping at look 7, saving weeks of runtime |
+| Project 2 retro | Ad 2.555% vs PSA 1.785% (43.1% relative lift, p = 1.7e-13). With the 96/4 split, power for a 10% relative lift was **52.5%**; the same 588,101 users split 50/50 would give 99.9% |
 
 ---
 
@@ -152,7 +160,7 @@ All statistical routines are implemented from first principles in `src/stats_uti
 The conjugate model is analytically exact for conversion-rate experiments and runs in milliseconds. MCMC (PyMC) adds complexity without benefit when the likelihood is Binomial.
 
 **Why simulate rather than use a real dataset?**  
-Simulated data makes every assumption explicit, ensures reproducibility, and eliminates dataset licensing concerns. The results are illustrative, not empirical claims.
+Simulated data makes every assumption explicit, ensures reproducibility, and eliminates dataset licensing concerns. The results in Sections 1–5 are illustrative, not empirical claims. Section 6 is the exception: it uses the real Project 2 counts.
 
 **Why implement corrections from scratch?**  
 Understanding the mechanics of each correction is critical for explaining trade-offs to stakeholders. A one-line `statsmodels` call gives answers; this framework gives *understanding*.
